@@ -140,3 +140,12 @@ static inline void wgs_unlink(WinGuiSeat *wgs)
     wgs->wgslistnode.prev->next = wgs->wgslistnode.next;
     wgs->wgslistnode.next->prev = wgs->wgslistnode.prev;
 }
+
+static inline WinGuiSeat* get_current_wgs() {
+    if (wgslisthead.next != &wgslisthead) {
+        WinGuiSeat* wgs = container_of(
+            wgslisthead.next, WinGuiSeat, wgslistnode);
+        return wgs;
+    }
+    return NULL;
+}

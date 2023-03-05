@@ -898,7 +898,6 @@ bool do_ssh_tunnel_config(Conf* conf)
     PortableDialogStuff* pds = pds_new(2);
 
     setup_ssh_tunnel_config_box(pds->ctrlbox, false, 0, 0);
-    // win_setup_config_box(pds->ctrlbox, &pds->dp->hwnd, has_help(), false, 0);
 
     pds->dp->wintitle = dupprintf("%s SSH Tunnel Configuration", appname);
     pds->dp->data = conf;

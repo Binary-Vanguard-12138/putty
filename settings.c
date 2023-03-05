@@ -552,6 +552,7 @@ void save_open_settings(settings_w *sesskey, Conf *conf)
      * the standard FORCE_ON / FORCE_OFF / AUTO. */
     write_setting_i(sesskey, "CloseOnExit", (conf_get_int(conf, CONF_close_on_exit)+2)%3);
     write_setting_b(sesskey, "WarnOnClose", !!conf_get_bool(conf, CONF_warn_on_close));
+    write_setting_b(sesskey, "AutostartOnReboot", !!conf_get_bool(conf, CONF_autostart_on_reboot));
     write_setting_i(sesskey, "PingInterval", conf_get_int(conf, CONF_ping_interval) / 60);      /* minutes */
     write_setting_i(sesskey, "PingIntervalSecs", conf_get_int(conf, CONF_ping_interval) % 60);  /* seconds */
     write_setting_b(sesskey, "TCPNoDelay", conf_get_bool(conf, CONF_tcp_nodelay));
@@ -844,6 +845,7 @@ void load_open_settings(settings_r *sesskey, Conf *conf)
      * the standard FORCE_ON / FORCE_OFF / AUTO. */
     i = gppi_raw(sesskey, "CloseOnExit", 1); conf_set_int(conf, CONF_close_on_exit, (i+1)%3);
     gppb(sesskey, "WarnOnClose", true, conf, CONF_warn_on_close);
+    gppb(sesskey, "AutostartOnReboot", true, conf, CONF_autostart_on_reboot);
     {
         /* This is two values for backward compatibility with 0.50/0.51 */
         int pingmin, pingsec;

@@ -2159,6 +2159,7 @@ bool dlg_is_visible(dlgcontrol *ctrl, dlgparam *dp)
      * box. So we can tell if a control is visible just by checking if
      * it _exists_.
      */
+    if (NULL == ctrl) return false;
     return dlg_findbyctrl(dp, ctrl) != NULL;
 }
 

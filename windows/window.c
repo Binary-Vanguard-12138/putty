@@ -982,6 +982,14 @@ void cleanup_exit(int code)
     exit(code);
 }
 
+Conf* get_current_conf() {
+    WinGuiSeat* wgs = get_current_wgs();
+    if (NULL == wgs) {
+        return NULL;
+    }
+    return wgs->conf;
+}
+
 /*
  * Refresh the saved-session submenu from `sesslist'.
  */

@@ -1778,6 +1778,7 @@ NORETURN void cleanup_exit(int);
     X(INT, NONE, addressfamily) /* ADDRTYPE_IPV[46] or ADDRTYPE_UNSPEC */ \
     X(INT, NONE, close_on_exit) /* FORCE_ON, FORCE_OFF, AUTO */ \
     X(BOOL, NONE, warn_on_close) \
+    X(BOOL, NONE, autostart_on_reboot) \
     X(INT, NONE, ping_interval) /* in seconds */ \
     X(BOOL, NONE, tcp_nodelay) \
     X(BOOL, NONE, tcp_keepalives) \

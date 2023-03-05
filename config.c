@@ -16,6 +16,8 @@
 #define HOST_BOX_TITLE "Host Name (or IP address)"
 #define PORT_BOX_TITLE "Port"
 
+Conf* get_current_conf();
+
 void conf_radiobutton_handler(dlgcontrol *ctrl, dlgparam *dlg,
                               void *data, int event)
 {
@@ -769,12 +771,21 @@ static void sshbug_handler_manual_only(dlgcontrol *ctrl, dlgparam *dlg,
     }
 }
 
+struct portfwd_data {
+    dlgcontrol* addbutton, * rembutton, * listbox;
+    dlgcontrol* sourcebox, * destbox, * direction;
+#ifndef NO_IPV6
+    dlgcontrol* addressfamily;
+#endif
+};
+
 struct sessionsaver_data {
     dlgcontrol *editbox, *listbox, *loadbutton, *savebutton, *delbutton;
     dlgcontrol *okbutton, *cancelbutton;
     struct sesslist sesslist;
     bool midsession;
     char *savedsession;     /* the current contents of ssd->editbox */
+    struct portfwd_data* pfd;
 };
 
 static void sessionsaver_data_free(void *ssdv)
@@ -819,6 +830,7 @@ static void sessionsaver_handler(dlgcontrol *ctrl, dlgparam *dlg,
     Conf *conf = (Conf *)data;
     struct sessionsaver_data *ssd =
         (struct sessionsaver_data *)ctrl->context.p;
+    struct portfwd_data* pfd = ssd->pfd;
 
     if (event == EVENT_REFRESH) {
         if (ctrl == ssd->editbox) {
@@ -941,6 +953,40 @@ static void sessionsaver_handler(dlgcontrol *ctrl, dlgparam *dlg,
              * session, get going.
              */
             if (conf_launchable(conf)) {
+                //conf_set_str_str(conf, CONF_portfwd, "L1000", "localhost:1000");
+                const char* family = "", * type = "L";
+                char* src, * key, * val;
+
+                src = dlg_editbox_get(pfd->sourcebox, dlg);
+                if (!*src) {
+                    dlg_error_msg(dlg, "You need to specify a source port number");
+                    sfree(src);
+                    return;
+                }
+                val = dlg_editbox_get(pfd->destbox, dlg);
+                if (!*val || !host_strchr(val, ':')) {
+                    dlg_error_msg(dlg,
+                        "You need to specify a destination address\n"
+                        "in the form \"host.name:port\"");
+                    sfree(src);
+                    sfree(val);
+                    return;
+                }
+
+                key = dupcat(family, type, src);
+                sfree(src);
+
+                if (conf_get_str_str_opt(conf, CONF_portfwd, key)) {
+                    dlg_error_msg(dlg, "Specified forwarding already exists");
+                }
+                else {
+                    conf_set_str_str(conf, CONF_portfwd, key, val);
+                }
+
+                sfree(key);
+                sfree(val);
+                dlg_refresh(pfd->listbox, dlg);
+
                 dlg_end(dlg, 1);
             } else
                 dlg_beep(dlg);
@@ -1264,14 +1310,6 @@ static void environ_handler(dlgcontrol *ctrl, dlgparam *dlg,
         }
     }
 }
-
-struct portfwd_data {
-    dlgcontrol *addbutton, *rembutton, *listbox;
-    dlgcontrol *sourcebox, *destbox, *direction;
-#ifndef NO_IPV6
-    dlgcontrol *addressfamily;
-#endif
-};
 
 static void portfwd_handler(dlgcontrol *ctrl, dlgparam *dlg,
                             void *data, int event)
@@ -3333,16 +3371,10 @@ void setup_config_box(struct controlbox *b, bool midsession,
 void setup_ssh_tunnel_config_box(struct controlbox* b, bool midsession,
     int protocol, int protcfginfo)
 {
-    Conf* conf = conf_new();
-    const struct BackendVtable* backvt;
+    Conf* conf = get_current_conf();
     struct controlset* s;
     struct sessionsaver_data* ssd;
-    struct charclass_data* ccd;
-    struct colour_data* cd;
-    struct ttymodes_data* td;
-    struct environ_data* ed;
     struct portfwd_data* pfd;
-    struct manual_hostkey_data* mh;
     dlgcontrol* c;
     bool resize_forbidden = false;
     char* str;
@@ -3395,7 +3427,7 @@ void setup_ssh_tunnel_config_box(struct controlbox* b, bool midsession,
         HELPCTX(ssh_tunnels_portfwd),
         portfwd_handler, P(pfd), P(NULL));
     pfd->sourcebox->column = 1;
-    //conf_set_str_str(conf, CONF_portfwd, "L1000", "localhost:1000");
+    ssd->pfd = pfd;
 
     if (!midsession) {
         struct hostport* hp = (struct hostport*)
@@ -3429,6 +3461,11 @@ void setup_ssh_tunnel_config_box(struct controlbox* b, bool midsession,
     }
 
     conf_set_int(conf, CONF_close_on_exit, AUTO);
-    conf_set_bool(conf, CONF_ssh_no_shell, true);    
+    conf_set_bool(conf, CONF_ssh_no_shell, true);
+
+    ctrl_checkbox(s, "Autostart upon OS boot", 'a',
+        HELPCTX(behaviour_autostart_on_reboot),
+        conf_checkbox_handler, I(CONF_autostart_on_reboot));
+
     ctrl_columns(s, 1, 100);
 }
