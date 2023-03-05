@@ -3329,3 +3329,106 @@ void setup_config_box(struct controlbox *b, bool midsession,
                       I(CONF_supdup_scroll));
     }
 }
+
+void setup_ssh_tunnel_config_box(struct controlbox* b, bool midsession,
+    int protocol, int protcfginfo)
+{
+    Conf* conf = conf_new();
+    const struct BackendVtable* backvt;
+    struct controlset* s;
+    struct sessionsaver_data* ssd;
+    struct charclass_data* ccd;
+    struct colour_data* cd;
+    struct ttymodes_data* td;
+    struct environ_data* ed;
+    struct portfwd_data* pfd;
+    struct manual_hostkey_data* mh;
+    dlgcontrol* c;
+    bool resize_forbidden = false;
+    char* str;
+
+    ssd = (struct sessionsaver_data*)
+        ctrl_alloc_with_free(b, sizeof(struct sessionsaver_data),
+            sessionsaver_data_free);
+    memset(ssd, 0, sizeof(*ssd));
+    ssd->savedsession = dupstr("");
+    ssd->midsession = midsession;
+
+    /*
+     * The standard panel that appears at the bottom of all panels:
+     * Open, Cancel, Apply etc.
+     */
+    s = ctrl_getset(b, "", "", "");
+    ctrl_columns(s, 5, 20, 20, 20, 20, 20);
+    ssd->okbutton = ctrl_pushbutton(s,
+        (midsession ? "Apply" : "Open"),
+        (char)(midsession ? 'a' : 'o'),
+        HELPCTX(no_help),
+        sessionsaver_handler, P(ssd));
+    ssd->okbutton->button.isdefault = true;
+    ssd->okbutton->column = 3;
+    ssd->cancelbutton = ctrl_pushbutton(s, "Cancel", 'c', HELPCTX(no_help),
+        sessionsaver_handler, P(ssd));
+    ssd->cancelbutton->button.iscancel = true;
+    ssd->cancelbutton->column = 4;
+    /* We carefully don't close the 5-column part, so that platform-
+     * specific add-ons can put extra buttons alongside Open and Cancel. */
+
+     /*
+      * The Session panel.
+      */
+    str = dupprintf("Basic options for your %s session", appname);
+    ctrl_settitle(b, "Session", str);
+    sfree(str);
+
+    s = ctrl_getset(b, "Session", "portfwd", "Port forwarding");
+    conf_set_bool(conf, CONF_lport_acceptall, true);
+    conf_set_bool(conf, CONF_rport_acceptall, true);
+
+    ctrl_columns(s, 2, 75, 25);
+    pfd = (struct portfwd_data*)ctrl_alloc(b, sizeof(struct portfwd_data));
+    pfd->destbox = ctrl_editbox(s, "Destination", 'i', 100,
+        HELPCTX(ssh_tunnels_portfwd),
+        portfwd_handler, P(pfd), P(NULL));
+    pfd->destbox->column = 0;
+    pfd->sourcebox = ctrl_editbox(s, "Source port", 's', 100,
+        HELPCTX(ssh_tunnels_portfwd),
+        portfwd_handler, P(pfd), P(NULL));
+    pfd->sourcebox->column = 1;
+    //conf_set_str_str(conf, CONF_portfwd, "L1000", "localhost:1000");
+
+    if (!midsession) {
+        struct hostport* hp = (struct hostport*)
+            ctrl_alloc(b, sizeof(struct hostport));
+        memset(hp, 0, sizeof(*hp));
+
+        s = ctrl_getset(b, "Session", "hostport",
+            "Specify the destination you want to connect to");
+        ctrl_columns(s, 2, 75, 25);
+        c = ctrl_editbox(s, HOST_BOX_TITLE, 'n', 100,
+            HELPCTX(session_hostname),
+            config_host_handler, I(0), I(0));
+        c->column = 0;
+        hp->host = c;
+        c = ctrl_editbox(s, PORT_BOX_TITLE, 'p', 100,
+            HELPCTX(session_hostname),
+            config_port_handler, I(0), I(0));
+        c->column = 1;
+        hp->port = c;
+
+        ctrl_editbox(s, "Username", 'u', 50,
+            HELPCTX(connection_username),
+            conf_editbox_handler, I(CONF_username), ED_STR);
+
+        c = ctrl_editbox(s, "Password (Optional)", 'w', 50,
+            HELPCTX(connection_password),
+            conf_editbox_handler, I(CONF_password), ED_STR);
+        c->editbox.password = true;
+
+        conf_set_int(conf, CONF_protocol, PROT_SSH);
+    }
+
+    conf_set_int(conf, CONF_close_on_exit, AUTO);
+    conf_set_bool(conf, CONF_ssh_no_shell, true);    
+    ctrl_columns(s, 1, 100);
+}

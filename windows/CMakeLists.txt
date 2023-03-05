@@ -114,6 +114,23 @@ set_target_properties(putty PROPERTIES
   LINK_FLAGS "${LFLAG_MANIFEST_NO}")
 installed_program(putty)
 
+add_executable(plinkgui
+  window.c
+  plinkgui.c
+  help.c
+  ${CMAKE_SOURCE_DIR}/stubs/no-console.c
+  plinkgui.rc)
+be_list(plinkgui PuTTY SSH SERIAL OTHERBACKENDS)
+add_dependencies(plinkgui generated_licence_h)
+target_link_libraries(plinkgui
+  guiterminal guimisc eventloop sshclient otherbackends settings network crypto
+  utils
+  ${platform_libraries})
+set_target_properties(plinkgui PROPERTIES
+  WIN32_EXECUTABLE ON
+  LINK_FLAGS "${LFLAG_MANIFEST_NO}")
+installed_program(plinkgui)
+
 add_executable(puttytel
   window.c
   putty.c

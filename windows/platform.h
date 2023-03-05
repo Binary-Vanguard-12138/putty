@@ -579,7 +579,8 @@ void win_setup_config_box(struct controlbox *b, HWND *hwndp, bool has_help,
  * Exports from dialog.c.
  */
 void defuse_showwindow(void);
-bool do_config(Conf *);
+bool do_config(Conf*);
+bool do_ssh_tunnel_config(Conf *);
 bool do_reconfig(HWND, Conf *, int);
 void showeventlog(HWND);
 void showabout(HWND);

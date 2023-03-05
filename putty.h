@@ -1847,6 +1847,7 @@ NORETURN void cleanup_exit(int);
     X(STR, STR, ttymodes) /* values are "Vvalue" or "A" */ \
     X(STR, STR, environmt) \
     X(STR, NONE, username) \
+    X(STR, NONE, password) \
     X(BOOL, NONE, username_from_env) \
     X(STR, NONE, localusername) \
     X(BOOL, NONE, rfc_environ) \
@@ -2648,6 +2649,8 @@ extern const struct conf_editbox_handler_type conf_editbox_int;
 
 void setup_config_box(struct controlbox *b, bool midsession,
                       int protocol, int protcfginfo);
+void setup_ssh_tunnel_config_box(struct controlbox* b, bool midsession,
+    int protocol, int protcfginfo);
 
 void setup_ca_config_box(struct controlbox *b);
 

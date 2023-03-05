@@ -680,6 +680,165 @@ static INT_PTR GenericMainDlgProc(HWND hwnd, UINT msg, WPARAM wParam,
     }
 }
 
+static INT_PTR SshTunnelMainDlgProc(HWND hwnd, UINT msg, WPARAM wParam,
+    LPARAM lParam, void* ctx)
+{
+    PortableDialogStuff* pds = (PortableDialogStuff*)ctx;
+    const int DEMO_SCREENSHOT_TIMER_ID = 1230;
+    struct treeview_faff tvfaff;
+
+    switch (msg) {
+    case WM_INITDIALOG:
+        pds_initdialog_start(pds, hwnd);
+
+        pds_create_controls(pds, TREE_BASE, IDCX_STDBASE, 3, 3, 235, "");
+
+        SendMessage(hwnd, WM_SETICON, (WPARAM)ICON_BIG,
+            (LPARAM)LoadIcon(hinst, MAKEINTRESOURCE(IDI_CFGICON)));
+
+        centre_window(hwnd);
+
+        /*
+         * Set up the tree view contents.
+         */
+        {
+            HTREEITEM hfirst = NULL;
+            int i;
+            char* path = NULL;
+            char* firstpath = NULL;
+
+            for (i = 0; i < pds->ctrlbox->nctrlsets; i++) {
+                struct controlset* s = pds->ctrlbox->ctrlsets[i];
+                HTREEITEM item;
+                int j;
+                char* c;
+
+                if (!s->pathname[0])
+                    continue;
+                j = path ? ctrl_path_compare(s->pathname, path) : 0;
+                if (j == INT_MAX)
+                    continue;          /* same path, nothing to add to tree */
+
+                /*
+                 * We expect never to find an implicit path
+                 * component. For example, we expect never to see
+                 * A/B/C followed by A/D/E, because that would
+                 * _implicitly_ create A/D. All our path prefixes
+                 * are expected to contain actual controls and be
+                 * selectable in the treeview; so we would expect
+                 * to see A/D _explicitly_ before encountering
+                 * A/D/E.
+                 */
+                assert(j == ctrl_path_elements(s->pathname) - 1);
+
+                c = strrchr(s->pathname, '/');
+                if (!c)
+                    c = s->pathname;
+                else
+                    c++;
+
+                item = treeview_insert(&tvfaff, j, c, s->pathname);
+                if (!hfirst) {
+                    hfirst = item;
+                    firstpath = s->pathname;
+                }
+
+                path = s->pathname;
+            }
+
+            /*
+             * And create the actual control set for that panel, to
+             * match the initial treeview selection.
+             */
+            assert(firstpath);   /* config.c must have given us _something_ */
+            pds_create_controls(pds, TREE_PANEL, IDCX_PANELBASE,
+                3, 3, 13, firstpath);
+            dlg_refresh(NULL, pds->dp);    /* and set up control values */
+        }
+
+        if (dialog_box_demo_screenshot_filename)
+            SetTimer(hwnd, DEMO_SCREENSHOT_TIMER_ID, TICKSPERSEC, NULL);
+
+        pds_initdialog_finish(pds);
+        return 0;
+
+    case WM_TIMER:
+        if (dialog_box_demo_screenshot_filename &&
+            (UINT_PTR)wParam == DEMO_SCREENSHOT_TIMER_ID) {
+            KillTimer(hwnd, DEMO_SCREENSHOT_TIMER_ID);
+            char* err = save_screenshot(
+                hwnd, dialog_box_demo_screenshot_filename);
+            if (err) {
+                MessageBox(hwnd, err, "Demo screenshot failure",
+                    MB_OK | MB_ICONERROR);
+                sfree(err);
+            }
+            ShinyEndDialog(hwnd, 0);
+        }
+        return 0;
+
+    case WM_NOTIFY:
+        if (LOWORD(wParam) == IDCX_TREEVIEW &&
+            ((LPNMHDR)lParam)->code == TVN_SELCHANGED) {
+            /*
+             * Selection-change events on the treeview cause us to do
+             * a flurry of control deletion and creation - but only
+             * after WM_INITDIALOG has finished. The initial
+             * selection-change event(s) during treeview setup are
+             * ignored.
+             */
+            HTREEITEM i;
+            TVITEM item;
+            char buffer[64];
+
+            if (!pds->initialised)
+                return 0;
+
+            i = TreeView_GetSelection(((LPNMHDR)lParam)->hwndFrom);
+
+            SendMessage(hwnd, WM_SETREDRAW, false, 0);
+
+            item.hItem = i;
+            item.pszText = buffer;
+            item.cchTextMax = sizeof(buffer);
+            item.mask = TVIF_TEXT | TVIF_PARAM;
+            TreeView_GetItem(((LPNMHDR)lParam)->hwndFrom, &item);
+            {
+                /* Destroy all controls in the currently visible panel. */
+                int k;
+                HWND item;
+                struct winctrl* c;
+
+                while ((c = winctrl_findbyindex(
+                    &pds->ctrltrees[TREE_PANEL], 0)) != NULL) {
+                    for (k = 0; k < c->num_ids; k++) {
+                        item = GetDlgItem(hwnd, c->base_id + k);
+                        if (item)
+                            DestroyWindow(item);
+                    }
+                    winctrl_rem_shortcuts(pds->dp, c);
+                    winctrl_remove(&pds->ctrltrees[TREE_PANEL], c);
+                    sfree(c->data);
+                    sfree(c);
+                }
+            }
+            pds_create_controls(pds, TREE_PANEL, IDCX_PANELBASE,
+                100, 3, 13, (char*)item.lParam);
+
+            dlg_refresh(NULL, pds->dp);    /* set up control values */
+
+            SendMessage(hwnd, WM_SETREDRAW, true, 0);
+            InvalidateRect(hwnd, NULL, true);
+
+            SetFocus(((LPNMHDR)lParam)->hwndFrom);     /* ensure focus stays */
+        }
+        return 0;
+
+    default:
+        return pds_default_dlgproc(pds, hwnd, msg, wParam, lParam);
+    }
+}
+
 void modal_about_box(HWND hwnd)
 {
     EnableWindow(hwnd, 0);
@@ -727,6 +886,29 @@ bool do_config(Conf *conf)
 
     ret = ShinyDialogBox(hinst, MAKEINTRESOURCE(IDD_MAINBOX), "PuTTYConfigBox",
                          NULL, GenericMainDlgProc, pds);
+
+    pds_free(pds);
+
+    return ret;
+}
+
+bool do_ssh_tunnel_config(Conf* conf)
+{
+    bool ret;
+    PortableDialogStuff* pds = pds_new(2);
+
+    setup_ssh_tunnel_config_box(pds->ctrlbox, false, 0, 0);
+    // win_setup_config_box(pds->ctrlbox, &pds->dp->hwnd, has_help(), false, 0);
+
+    pds->dp->wintitle = dupprintf("%s SSH Tunnel Configuration", appname);
+    pds->dp->data = conf;
+
+    dlg_auto_set_fixed_pitch_flag(pds->dp);
+
+    pds->dp->shortcuts['g'] = true;          /* the treeview: `Cate&gory' */
+
+    ret = ShinyDialogBox(hinst, MAKEINTRESOURCE(IDD_MAINBOX), "PuTTYConfigBox",
+        NULL, SshTunnelMainDlgProc, pds);
 
     pds_free(pds);
 
