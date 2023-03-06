@@ -114,22 +114,22 @@ set_target_properties(putty PROPERTIES
   LINK_FLAGS "${LFLAG_MANIFEST_NO}")
 installed_program(putty)
 
-add_executable(plinkgui
+add_executable(telnet-2-ssh
   window.c
-  plinkgui.c
+  telnet-2-ssh.c
   help.c
   ${CMAKE_SOURCE_DIR}/stubs/no-console.c
-  plinkgui.rc)
-be_list(plinkgui PuTTY SSH SERIAL OTHERBACKENDS)
-add_dependencies(plinkgui generated_licence_h)
-target_link_libraries(plinkgui
+  telnet-2-ssh.rc)
+be_list(telnet-2-ssh PuTTY SSH SERIAL OTHERBACKENDS)
+add_dependencies(telnet-2-ssh generated_licence_h)
+target_link_libraries(telnet-2-ssh
   guiterminal guimisc eventloop sshclient otherbackends settings network crypto
   utils
   ${platform_libraries})
-set_target_properties(plinkgui PROPERTIES
+set_target_properties(telnet-2-ssh PROPERTIES
   WIN32_EXECUTABLE ON
   LINK_FLAGS "${LFLAG_MANIFEST_NO}")
-installed_program(plinkgui)
+installed_program(telnet-2-ssh)
 
 add_executable(puttytel
   window.c

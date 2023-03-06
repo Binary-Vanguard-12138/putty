@@ -1,8 +1,8 @@
 #include "rcstuff.h"
 #include "putty-rc.h"
 
-#define APPNAME "PlinkGUI"
-#define APPDESC "Putty SSH Tunnel Client"
+#define APPNAME "telnet-2-ssh"
+#define APPDESC "DXCluster telnet-2-ssh Tunnel Client"
 
 IDI_MAINICON ICON "putty.ico"
 IDI_CFGICON ICON "puttycfg.ico"

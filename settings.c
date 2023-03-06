@@ -817,7 +817,7 @@ void load_open_settings(settings_r *sesskey, Conf *conf)
     conf_set_str(conf, CONF_remote_cmd2, "");
     conf_set_str(conf, CONF_ssh_nc_host, "");
 
-    gpps(sesskey, "HostName", "", conf, CONF_host);
+    gpps(sesskey, "HostName", "dxcluster.hb9vqq.ch", conf, CONF_host);
     gppfile(sesskey, "LogFileName", conf, CONF_logfilename);
     gppi(sesskey, "LogType", 0, conf, CONF_logtype);
     gppi(sesskey, "LogFileClash", LGXF_ASK, conf, CONF_logxfovr);
@@ -940,7 +940,7 @@ void load_open_settings(settings_r *sesskey, Conf *conf)
          conf, CONF_proxy_telnet_command);
     gppi(sesskey, "ProxyLogToTerm", FORCE_OFF, conf, CONF_proxy_log_to_term);
     gppmap(sesskey, "Environment", conf, CONF_environmt);
-    gpps(sesskey, "UserName", "", conf, CONF_username);
+    gpps(sesskey, "UserName", "dxcluster", conf, CONF_username);
     gpps(sesskey, "Password", "", conf, CONF_password);
     gppb(sesskey, "UserNameFromEnvironment", false,
          conf, CONF_username_from_env);

@@ -899,7 +899,7 @@ bool do_ssh_tunnel_config(Conf* conf)
 
     setup_ssh_tunnel_config_box(pds->ctrlbox, false, 0, 0);
 
-    pds->dp->wintitle = dupprintf("%s SSH Tunnel Configuration", appname);
+    pds->dp->wintitle = dupprintf("%s Telnet-2-SSH Utility", "DXCluster");
     pds->dp->data = conf;
 
     dlg_auto_set_fixed_pitch_flag(pds->dp);

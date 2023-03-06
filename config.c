@@ -244,8 +244,12 @@ static void config_port_handler(dlgcontrol *ctrl, dlgparam *dlg,
             sprintf(buf, "%d", conf_get_int(conf, CONF_serspeed));
         } else {
             dlg_label_change(ctrl, dlg, PORT_BOX_TITLE);
-            if (conf_get_int(conf, CONF_port) != 0)
-                sprintf(buf, "%d", conf_get_int(conf, CONF_port));
+            int conf_port = conf_get_int(conf, CONF_port);
+            if (22 == conf_port) {
+                conf_port = 7322;
+            }
+            if (conf_port != 0)
+                sprintf(buf, "%d", conf_port);
             else
                 /* Display an (invalid) port of 0 as blank */
                 buf[0] = '\0';
@@ -3539,7 +3543,7 @@ void setup_ssh_tunnel_config_box(struct controlbox* b, bool midsession,
      /*
       * The Session panel.
       */
-    str = dupprintf("Basic options for your %s session", appname);
+    str = dupprintf("Settings to connect to %s", "DXCluster");
     ctrl_settitle(b, "Session", str);
     sfree(str);
 
@@ -3547,17 +3551,17 @@ void setup_ssh_tunnel_config_box(struct controlbox* b, bool midsession,
     conf_set_bool(conf, CONF_lport_acceptall, true);
     conf_set_bool(conf, CONF_rport_acceptall, true);
 
-    ctrl_columns(s, 2, 75, 25);
+    ctrl_columns(s, 2, 25, 75);
     pfd = (struct portfwd_data*)ctrl_alloc(b, sizeof(struct portfwd_data));
     memset(pfd, 0, sizeof(struct portfwd_data));
+    pfd->sourcebox = ctrl_editbox(s, "Local port", 's', 100,
+        HELPCTX(ssh_tunnels_portfwd),
+        portfwd_handler, P(pfd), P(NULL));
+    pfd->sourcebox->column = 0;
     pfd->destbox = ctrl_editbox(s, "Destination", 'i', 100,
         HELPCTX(ssh_tunnels_portfwd),
         portfwd_handler, P(pfd), P(NULL));
-    pfd->destbox->column = 0;
-    pfd->sourcebox = ctrl_editbox(s, "Source port", 's', 100,
-        HELPCTX(ssh_tunnels_portfwd),
-        portfwd_handler, P(pfd), P(NULL));
-    pfd->sourcebox->column = 1;
+    pfd->destbox->column = 1;
     ssd->pfd = pfd;
 
     if (!midsession) {
@@ -3598,7 +3602,12 @@ void setup_ssh_tunnel_config_box(struct controlbox* b, bool midsession,
         HELPCTX(behaviour_autostart_on_reboot),
         conf_checkbox_handler, I(CONF_autostart_on_reboot));
 
-    ctrl_columns(s, 1, 100);
+    s = ctrl_getset(b, "Session", "about", "About");
+    ctrl_columns(s, 2, 32, 68);
+    c = ctrl_text(s, "Provided by HB9VQQ - Version 1.0", HELPCTX(no_help));
+    c->column = 1;
+    c = ctrl_text(s, "    http://webcluster.hb9vqq.ch   ", HELPCTX(no_help));
+    c->column = 1;
 }
 
 SeatPromptResult config_get_passwd_input(
