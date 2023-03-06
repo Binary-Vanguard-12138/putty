@@ -3587,3 +3587,42 @@ void setup_ssh_tunnel_config_box(struct controlbox* b, bool midsession,
 
     ctrl_columns(s, 1, 100);
 }
+
+SeatPromptResult config_get_passwd_input(
+    prompts_t* p, cmdline_get_passwd_input_state* state)
+{
+    Conf* conf = get_current_conf();
+    char* password = conf_get_str(conf, CONF_password);
+    /*
+     * We only handle prompts which don't echo (which we assume to be
+     * passwords), and (currently) we only cope with a password prompt
+     * that comes in a prompt-set on its own. Also, we don't use a
+     * command-line password for any kind of prompt which is destined
+     * for local use rather than to be sent to the server: the idea is
+     * to pre-fill _passwords_, not private-key passphrases (for which
+     * there are better alternatives available).
+     */
+    if (p->n_prompts != 1 || p->prompts[0]->echo || !p->to_server) {
+        return SPR_INCOMPLETE;
+    }
+
+    /*
+     * If we've tried once, return utter failure (no more passwords left
+     * to try).
+     */
+    if (state->tried)
+        return SPR_SW_ABORT("Configured password was not accepted");
+
+    /*
+     * If we never had a password available in the first place, we
+     * can't do anything in any case. (But we delay this test until
+     * after trying once, so that even if we free cmdline_password
+     * below, we'll still remember that we _used_ to have one.)
+     */
+    if (!password || !strlen(password))
+        return SPR_INCOMPLETE;
+
+    prompt_set_result(p->prompts[0], password);
+    state->tried = true;
+    return SPR_OK;
+}
