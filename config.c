@@ -248,8 +248,10 @@ static void config_port_handler(dlgcontrol *ctrl, dlgparam *dlg,
             if (22 == conf_port) {
                 conf_port = 7322;
             }
-            if (conf_port != 0)
+            if (conf_port != 0) {
+                conf_set_int(conf, CONF_port, conf_port);
                 sprintf(buf, "%d", conf_port);
+            }
             else
                 /* Display an (invalid) port of 0 as blank */
                 buf[0] = '\0';

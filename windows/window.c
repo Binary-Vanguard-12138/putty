@@ -5933,10 +5933,10 @@ static SeatPromptResult win_seat_get_userpass_input(Seat *seat, prompts_t *p)
     SeatPromptResult spr;
     spr = cmdline_get_passwd_input(p, &wgs->cmdline_get_passwd_state, true);
     if (spr.kind == SPRK_INCOMPLETE) {
-        spr = config_get_passwd_input(p, &wgs->cmdline_get_passwd_state);
-        if (spr.kind == SPRK_INCOMPLETE) {
+        //spr = config_get_passwd_input(p, &wgs->cmdline_get_passwd_state);
+        //if (spr.kind == SPRK_INCOMPLETE) {
             spr = term_get_userpass_input(wgs->term, p);
-        }
+        //}
     }
     return spr;
 }
