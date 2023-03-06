@@ -1,0 +1,23 @@
+We have an old client application that uses Telnet to connect to internet Hosts. We need a client Application that tunnels Telnet through SSH.
+
+The client proxy App must Tunnel Telnet through SSH
+The client proxy application must provide a configurable local client listener (localhost) Port
+The client proxy App must provide the configuration of  the remote SSH Tunnel by IP address or DNS name
+The client application proxy must provide the configuration of the remote SSH Port
+The client application proxy must provide the configuration of the SSH username and (optional) password.
+The client application proxy must provide an option for Autostart upon OS boot
+
+This could all be done with Putty as documented in the attachment. But that's too complicated for normal users. I need an installable Windows Application which sits in the Taskbar when executed and provides the functionality described above.
+
+The Test environment will be provided including an Internet-based SSH Server to test everything.
+
+Mac OS is at a later stage.
+
+
+User Input fields:
+- Local Listener IP: default localhost but can be any IP address
+- Local Listener Port: default 7300 but can be any Port
+- Remote SSH IP address:
+- Remote SSH Port:
+- SSH username:
+- SSH password: (optional, not mandatory)
