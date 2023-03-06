@@ -1456,23 +1456,36 @@ static void portfwd_handler(dlgcontrol *ctrl, dlgparam *dlg,
             dlg_radiobutton_set(ctrl, dlg, 0);
 #endif
         }
-        else {
+        else if (ctrl == pfd->sourcebox) {
             // Fill local port and address.
             char* key, * val;
+            bool value_set = false;
             for (val = conf_get_str_strs(conf, CONF_portfwd, NULL, &key);
                 val != NULL;
                 val = conf_get_str_strs(conf, CONF_portfwd, key, &key)) {
-                if (ctrl == pfd->sourcebox) {
-                    if ('L' == key[0]) {
-                        dlg_editbox_set(ctrl, dlg, key + 1);
-                    }
-                }
-                else if (ctrl == pfd->destbox) {
-                    dlg_editbox_set(ctrl, dlg, val);
+                value_set = true;
+                if ('L' == key[0]) {
+                    dlg_editbox_set(ctrl, dlg, key + 1);
                 }
             }
+            if (false == value_set) {
+                dlg_editbox_set(ctrl, dlg, "7300");
+            }
         }
-        
+        else if (ctrl == pfd->destbox) {
+            // Fill local port and address.
+            char* key, * val;
+            bool value_set = false;
+            for (val = conf_get_str_strs(conf, CONF_portfwd, NULL, &key);
+                val != NULL;
+                val = conf_get_str_strs(conf, CONF_portfwd, key, &key)) {
+                value_set = true;
+                dlg_editbox_set(ctrl, dlg, val);
+            }
+            if (false == value_set) {
+                dlg_editbox_set(ctrl, dlg, "localhost:7300");
+            }
+        }
     } else if (event == EVENT_ACTION) {
         if (ctrl == pfd->addbutton) {
             const char *family, *type;
