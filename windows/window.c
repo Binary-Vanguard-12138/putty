@@ -990,6 +990,31 @@ Conf* get_current_conf() {
     return wgs->conf;
 }
 
+void toggle_autostart(bool enable) {
+    LPCSTR stuff = "PuttySshTunnel";
+    char path[MAX_PATH] = { 0 };
+    GetModuleFileName(0, path, _countof(path) - 1);
+
+#if defined(_WIN64)
+#define CROSS_ACCESS KEY_WOW64_32KEY
+#else
+#define CROSS_ACCESS KEY_WOW64_64KEY
+#endif
+
+    HKEY hkey;
+    long regOpenResult;
+    regOpenResult = RegOpenKeyEx(HKEY_CURRENT_USER, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_ALL_ACCESS | CROSS_ACCESS, &hkey);
+    if (ERROR_SUCCESS == regOpenResult) {
+        if (enable) {
+            RegSetValueEx(hkey, stuff, 0, REG_SZ, (BYTE*)path, strlen(path));
+        }
+        else {
+            RegDeleteValue(hkey, stuff);
+        }
+    }
+    RegCloseKey(hkey);
+}
+
 /*
  * Refresh the saved-session submenu from `sesslist'.
  */

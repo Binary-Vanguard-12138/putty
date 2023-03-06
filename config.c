@@ -15,8 +15,11 @@
 
 #define HOST_BOX_TITLE "Host Name (or IP address)"
 #define PORT_BOX_TITLE "Port"
+#define DEFAULT_SETTINGS "Default Settings"
+#define ONLY_SETTING "Only Setting"
 
 Conf* get_current_conf();
+void toggle_autostart(bool enable);
 
 void conf_radiobutton_handler(dlgcontrol *ctrl, dlgparam *dlg,
                               void *data, int event)
@@ -102,7 +105,12 @@ void conf_checkbox_handler(dlgcontrol *ctrl, dlgparam *dlg,
         bool val = conf_get_bool(conf, key);
         dlg_checkbox_set(ctrl, dlg, (!val ^ !invert));
     } else if (event == EVENT_VALCHANGE) {
-        conf_set_bool(conf, key, !dlg_checkbox_get(ctrl,dlg) ^ !invert);
+        const bool new_value = !dlg_checkbox_get(ctrl, dlg) ^ !invert;
+        if (CONF_autostart_on_reboot == key) {
+            // Register / Unregister autostart
+            toggle_autostart(new_value);
+        }
+        conf_set_bool(conf, key, new_value);
     }
 }
 
@@ -811,7 +819,7 @@ static bool load_selected_session(
         dlg_beep(dlg);
         return false;
     }
-    isdef = !strcmp(ssd->sesslist.sessions[i], "Default Settings");
+    isdef = !strcmp(ssd->sesslist.sessions[i], DEFAULT_SETTINGS);
     load_settings(ssd->sesslist.sessions[i], conf);
     sfree(ssd->savedsession);
     ssd->savedsession = dupstr(isdef ? "" : ssd->sesslist.sessions[i]);
@@ -830,7 +838,6 @@ static void sessionsaver_handler(dlgcontrol *ctrl, dlgparam *dlg,
     Conf *conf = (Conf *)data;
     struct sessionsaver_data *ssd =
         (struct sessionsaver_data *)ctrl->context.p;
-    struct portfwd_data* pfd = ssd->pfd;
 
     if (event == EVENT_REFRESH) {
         if (ctrl == ssd->editbox) {
@@ -881,14 +888,14 @@ static void sessionsaver_handler(dlgcontrol *ctrl, dlgparam *dlg,
                 dlg_end(dlg, 1);       /* it's all over, and succeeded */
             }
         } else if (ctrl == ssd->savebutton) {
-            bool isdef = !strcmp(ssd->savedsession, "Default Settings");
+            bool isdef = !strcmp(ssd->savedsession, DEFAULT_SETTINGS);
             if (!ssd->savedsession[0]) {
                 int i = dlg_listbox_index(ssd->listbox, dlg);
                 if (i < 0) {
                     dlg_beep(dlg);
                     return;
                 }
-                isdef = !strcmp(ssd->sesslist.sessions[i], "Default Settings");
+                isdef = !strcmp(ssd->sesslist.sessions[i], DEFAULT_SETTINGS);
                 sfree(ssd->savedsession);
                 ssd->savedsession = dupstr(isdef ? "" :
                                            ssd->sesslist.sessions[i]);
@@ -953,10 +960,88 @@ static void sessionsaver_handler(dlgcontrol *ctrl, dlgparam *dlg,
              * session, get going.
              */
             if (conf_launchable(conf)) {
-                //conf_set_str_str(conf, CONF_portfwd, "L1000", "localhost:1000");
+                dlg_end(dlg, 1);
+            } else
+                dlg_beep(dlg);
+        } else if (ctrl == ssd->cancelbutton) {
+            dlg_end(dlg, 0);
+        }
+    }
+}
+
+static void session_start_handler(dlgcontrol* ctrl, dlgparam* dlg,
+    void* data, int event)
+{
+    Conf* conf = (Conf*)data;
+    struct sessionsaver_data* ssd =
+        (struct sessionsaver_data*)ctrl->context.p;
+    struct portfwd_data* pfd = ssd->pfd;
+
+    if (event == EVENT_REFRESH) {
+        if (ctrl == ssd->editbox) {
+            dlg_editbox_set(ctrl, dlg, ssd->savedsession);
+        }
+        else if (ctrl == ssd->listbox) {
+            int i;
+            dlg_update_start(ctrl, dlg);
+            dlg_listbox_clear(ctrl, dlg);
+            for (i = 0; i < ssd->sesslist.nsessions; i++)
+                dlg_listbox_add(ctrl, dlg, ssd->sesslist.sessions[i]);
+            dlg_update_done(ctrl, dlg);
+        }
+    }
+    else if (event == EVENT_ACTION) {
+        bool mbl = false;
+        if (ctrl == ssd->okbutton) {
+            if (ssd->midsession) {
+                /* In a mid-session Change Settings, Apply is always OK. */
+                dlg_end(dlg, 1);
+                return;
+            }
+            /*
+             * Annoying special case. If the `Open' button is
+             * pressed while no host name is currently set, _and_
+             * the session list previously had the focus, _and_
+             * there was a session selected in that which had a
+             * valid host name in it, then load it and go.
+             */
+            if (dlg_last_focused(ctrl, dlg) == ssd->listbox &&
+                !conf_launchable(conf) && dlg_is_visible(ssd->listbox, dlg)) {
+                Conf* conf2 = conf_new();
+                bool mbl = false;
+                if (!load_selected_session(ssd, dlg, conf2, &mbl)) {
+                    dlg_beep(dlg);
+                    conf_free(conf2);
+                    return;
+                }
+                /* If at this point we have a valid session, go! */
+                if (mbl && conf_launchable(conf2)) {
+                    conf_copy_into(conf, conf2);
+                    dlg_end(dlg, 1);
+                }
+                else
+                    dlg_beep(dlg);
+
+                conf_free(conf2);
+                return;
+            }
+
+            /*
+             * Otherwise, do the normal thing: if we have a valid
+             * session, get going.
+             */
+            if (conf_launchable(conf)) {
                 const char* family = "", * type = "L";
                 char* src, * key, * val;
 
+                // Delete all the existing entries
+                for (val = conf_get_str_strs(conf, CONF_portfwd, NULL, &key);
+                    val != NULL;
+                    val = conf_get_str_strs(conf, CONF_portfwd, key, &key)) {
+                    conf_del_str_str(conf, CONF_portfwd, key);
+                }
+
+                // Set the new entry
                 src = dlg_editbox_get(pfd->sourcebox, dlg);
                 if (!*src) {
                     dlg_error_msg(dlg, "You need to specify a source port number");
@@ -978,19 +1063,31 @@ static void sessionsaver_handler(dlgcontrol *ctrl, dlgparam *dlg,
 
                 if (conf_get_str_str_opt(conf, CONF_portfwd, key)) {
                     dlg_error_msg(dlg, "Specified forwarding already exists");
+                    return;
                 }
                 else {
+                    //conf_set_str_str(conf, CONF_portfwd, "L3700", "localhost:3700");
                     conf_set_str_str(conf, CONF_portfwd, key, val);
                 }
 
                 sfree(key);
                 sfree(val);
-                dlg_refresh(pfd->listbox, dlg);
+                //dlg_refresh(pfd->listbox, dlg); // We have no listbox anymore
+
+                {
+                    char* errmsg = save_settings(ONLY_SETTING, conf);
+                    if (errmsg) {
+                        dlg_error_msg(dlg, errmsg);
+                        sfree(errmsg);
+                    }
+                }
 
                 dlg_end(dlg, 1);
-            } else
+            }
+            else
                 dlg_beep(dlg);
-        } else if (ctrl == ssd->cancelbutton) {
+        }
+        else if (ctrl == ssd->cancelbutton) {
             dlg_end(dlg, 0);
         }
     }
@@ -1359,6 +1456,23 @@ static void portfwd_handler(dlgcontrol *ctrl, dlgparam *dlg,
             dlg_radiobutton_set(ctrl, dlg, 0);
 #endif
         }
+        else {
+            // Fill local port and address.
+            char* key, * val;
+            for (val = conf_get_str_strs(conf, CONF_portfwd, NULL, &key);
+                val != NULL;
+                val = conf_get_str_strs(conf, CONF_portfwd, key, &key)) {
+                if (ctrl == pfd->sourcebox) {
+                    if ('L' == key[0]) {
+                        dlg_editbox_set(ctrl, dlg, key + 1);
+                    }
+                }
+                else if (ctrl == pfd->destbox) {
+                    dlg_editbox_set(ctrl, dlg, val);
+                }
+            }
+        }
+        
     } else if (event == EVENT_ACTION) {
         if (ctrl == pfd->addbutton) {
             const char *family, *type;
@@ -3385,7 +3499,10 @@ void setup_ssh_tunnel_config_box(struct controlbox* b, bool midsession,
     memset(ssd, 0, sizeof(*ssd));
     ssd->savedsession = dupstr("");
     ssd->midsession = midsession;
-
+    if (false == load_settings(ONLY_SETTING, conf)) {
+        // If fails to load only one setting.
+        // Do nothing
+    }
     /*
      * The standard panel that appears at the bottom of all panels:
      * Open, Cancel, Apply etc.
@@ -3396,11 +3513,11 @@ void setup_ssh_tunnel_config_box(struct controlbox* b, bool midsession,
         (midsession ? "Apply" : "Open"),
         (char)(midsession ? 'a' : 'o'),
         HELPCTX(no_help),
-        sessionsaver_handler, P(ssd));
+        session_start_handler, P(ssd));
     ssd->okbutton->button.isdefault = true;
     ssd->okbutton->column = 3;
     ssd->cancelbutton = ctrl_pushbutton(s, "Cancel", 'c', HELPCTX(no_help),
-        sessionsaver_handler, P(ssd));
+        session_start_handler, P(ssd));
     ssd->cancelbutton->button.iscancel = true;
     ssd->cancelbutton->column = 4;
     /* We carefully don't close the 5-column part, so that platform-
@@ -3419,6 +3536,7 @@ void setup_ssh_tunnel_config_box(struct controlbox* b, bool midsession,
 
     ctrl_columns(s, 2, 75, 25);
     pfd = (struct portfwd_data*)ctrl_alloc(b, sizeof(struct portfwd_data));
+    memset(pfd, 0, sizeof(struct portfwd_data));
     pfd->destbox = ctrl_editbox(s, "Destination", 'i', 100,
         HELPCTX(ssh_tunnels_portfwd),
         portfwd_handler, P(pfd), P(NULL));
