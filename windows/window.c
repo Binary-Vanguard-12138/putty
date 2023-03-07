@@ -756,6 +756,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     /*
      * Finally show the window!
      */
+    show = SW_MINIMIZE;     // added by David to minimized terminal 
     ShowWindow(wgs->term_hwnd, show);
     SetForegroundWindow(wgs->term_hwnd);
 
