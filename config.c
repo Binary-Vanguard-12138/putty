@@ -16,10 +16,10 @@
 #define HOST_BOX_TITLE "Host Name (or IP address)"
 #define PORT_BOX_TITLE "Port"
 #define DEFAULT_SETTINGS "Default Settings"
-#define ONLY_SETTING "Only Setting"
+#define SSH_TUNNEL_SETTING "SshTunnel"
 
 Conf* get_current_conf();
-void toggle_autostart(bool enable);
+void toggle_autostart(Conf* conf, bool enable);
 
 void conf_radiobutton_handler(dlgcontrol *ctrl, dlgparam *dlg,
                               void *data, int event)
@@ -106,11 +106,12 @@ void conf_checkbox_handler(dlgcontrol *ctrl, dlgparam *dlg,
         dlg_checkbox_set(ctrl, dlg, (!val ^ !invert));
     } else if (event == EVENT_VALCHANGE) {
         const bool new_value = !dlg_checkbox_get(ctrl, dlg) ^ !invert;
+        conf_set_bool(conf, key, new_value);
         if (CONF_autostart_on_reboot == key) {
             // Register / Unregister autostart
-            toggle_autostart(new_value);
+            toggle_autostart(conf, new_value);
+            save_settings(SSH_TUNNEL_SETTING, conf);
         }
-        conf_set_bool(conf, key, new_value);
     }
 }
 
@@ -1081,7 +1082,7 @@ static void session_start_handler(dlgcontrol* ctrl, dlgparam* dlg,
                 //dlg_refresh(pfd->listbox, dlg); // We have no listbox anymore
 
                 {
-                    char* errmsg = save_settings(ONLY_SETTING, conf);
+                    char* errmsg = save_settings(SSH_TUNNEL_SETTING, conf);
                     if (errmsg) {
                         dlg_error_msg(dlg, errmsg);
                         sfree(errmsg);
@@ -3518,9 +3519,10 @@ void setup_ssh_tunnel_config_box(struct controlbox* b, bool midsession,
     memset(ssd, 0, sizeof(*ssd));
     ssd->savedsession = dupstr("");
     ssd->midsession = midsession;
-    if (false == load_settings(ONLY_SETTING, conf)) {
-        // If fails to load only one setting.
-        // Do nothing
+    bool bIsFirst = false;
+    if (false == load_settings(SSH_TUNNEL_SETTING, conf)) {
+        // If fails to load ssh tunnel setting.
+        bIsFirst = true;
     }
     /*
      * The standard panel that appears at the bottom of all panels:
@@ -3610,6 +3612,11 @@ void setup_ssh_tunnel_config_box(struct controlbox* b, bool midsession,
     c->column = 1;
     c = ctrl_text(s, "    http://webcluster.hb9vqq.ch   ", HELPCTX(no_help));
     c->column = 1;
+
+    if (true == bIsFirst) {
+        // Save ssh tunnel setting
+        save_settings(SSH_TUNNEL_SETTING, conf);
+    }
 }
 
 SeatPromptResult config_get_passwd_input(

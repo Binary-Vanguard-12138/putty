@@ -65,6 +65,10 @@
 #define WM_FULLSCR_ON_MAX (WM_APP + 3)
 #define WM_GOT_CLIPDATA (WM_APP + 4)
 
+#define WM_MYAPP_NOTIFY (WM_APP + 100)
+#define NOTIFY_ICON_ID      1
+
+
 /* Needed for Chinese support and apparently not always defined. */
 #ifndef VK_PROCESSKEY
 #define VK_PROCESSKEY 0xE5
@@ -756,9 +760,21 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     /*
      * Finally show the window!
      */
-    show = SW_MINIMIZE;     // added by David to minimized terminal 
+    show = SW_HIDE;     // added by David to minimized terminal 
     ShowWindow(wgs->term_hwnd, show);
     SetForegroundWindow(wgs->term_hwnd);
+
+    // Add system tray icon
+    NOTIFYICONDATA nid = { 0 };
+    nid.cbSize = sizeof(NOTIFYICONDATA);
+    nid.hWnd = wgs->term_hwnd;
+    nid.uID = NOTIFY_ICON_ID;
+    nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+    nid.uCallbackMessage = WM_MYAPP_NOTIFY;
+    nid.hIcon = LoadIcon(inst, MAKEINTRESOURCE(IDI_MAINICON));
+    strcpy(nid.szTip, "Telnet-2-SSH");
+
+    Shell_NotifyIcon(NIM_ADD, &nid);
 
     term_set_focus(wgs->term, GetForegroundWindow() == wgs->term_hwnd);
     UpdateWindow(wgs->term_hwnd);
@@ -991,9 +1007,9 @@ Conf* get_current_conf() {
     return wgs->conf;
 }
 
-void toggle_autostart(bool enable) {
+void toggle_autostart(Conf* conf, bool enable) {
     LPCSTR stuff = "PuttySshTunnel";
-    char path[MAX_PATH] = { 0 };
+    char path[MAX_PATH * 2] = { 0 };
     GetModuleFileName(0, path, _countof(path) - 1);
 
 #if defined(_WIN64)
@@ -1007,7 +1023,43 @@ void toggle_autostart(bool enable) {
     regOpenResult = RegOpenKeyEx(HKEY_CURRENT_USER, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_ALL_ACCESS | CROSS_ACCESS, &hkey);
     if (ERROR_SUCCESS == regOpenResult) {
         if (enable) {
-            RegSetValueEx(hkey, stuff, 0, REG_SZ, (BYTE*)path, strlen(path));
+            const int conf_port = conf ? conf_get_int(conf, CONF_port) : 7300;
+            const char* conf_host = conf ? conf_get_str(conf, CONF_host) : "dxcluster.hb9vqq.ch";
+            const char* conf_username = conf ? conf_get_str(conf, CONF_username) : "dxcluster";
+            const char* conf_password = conf ? conf_get_str(conf, CONF_password) : "";
+            char* conf_proxy_destination = NULL;
+            char* conf_proxy_source_port = NULL;
+            bool value_set = false;
+            if (conf) {
+                char* key, * val;
+                for (val = conf_get_str_strs(conf, CONF_portfwd, NULL, &key);
+                    val != NULL;
+                    val = conf_get_str_strs(conf, CONF_portfwd, key, &key)) {
+                    if ('L' == key[0]) {
+                        value_set = true;
+                        conf_proxy_source_port = key + 1;
+                    }
+                    conf_proxy_destination = val;
+                }
+            }
+            if (false == value_set) {
+                // Can not find tunnel information
+                conf_proxy_source_port = "7300";
+                conf_proxy_destination = "localhost:7300";
+            }
+
+            size_t total_cmd_len = 0x100 + strlen(path) + strlen(conf_host) + strlen(conf_username) + strlen(conf_password) + strlen(conf_proxy_destination) + strlen(conf_proxy_source_port);
+            char* cmd_buffer = calloc(total_cmd_len, sizeof(char));
+            if (NULL == cmd_buffer) {
+                return;
+            }
+            if (NULL == conf_password || 0 == strlen(conf_password)) {
+                snprintf(cmd_buffer, total_cmd_len - 1, "%s -ssh %s@%s -P %d -L %s:%s -N", path, conf_username, conf_host, conf_port, conf_proxy_source_port, conf_proxy_destination);
+            }
+            else {
+                snprintf(cmd_buffer, total_cmd_len - 1, "%s -ssh %s@%s -P %d -pw %s -L %s:%s -N", path, conf_username, conf_host, conf_port, conf_password, conf_proxy_source_port, conf_proxy_destination);
+            }
+            RegSetValueEx(hkey, stuff, 0, REG_SZ, (BYTE*)cmd_buffer, strlen(cmd_buffer));
         }
         else {
             RegDeleteValue(hkey, stuff);
@@ -2240,6 +2292,10 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
       }
       case WM_DESTROY:
         show_mouseptr(wgs, true);
+        NOTIFYICONDATA nid = { 0 };
+        //nid.hWnd = wgs->term_hwnd;
+        nid.uID = NOTIFY_ICON_ID;
+        Shell_NotifyIcon(NIM_DELETE, &nid);
         PostQuitMessage(0);
         return 0;
       case WM_INITMENUPOPUP:
@@ -3413,6 +3469,15 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
       case WM_GOT_CLIPDATA:
         process_clipdata(wgs, (HGLOBAL)lParam, wParam);
         return 0;
+      case WM_MYAPP_NOTIFY:
+          if (LOWORD(lParam) == WM_LBUTTONDOWN)
+          {
+              if (IsWindowVisible(hwnd))
+                  ShowWindow(hwnd, SW_HIDE);
+              else
+                  ShowWindow(hwnd, SW_SHOW);
+          }
+          break;
       default:
         if (message == wm_mousewheel || message == WM_MOUSEWHEEL
                                                 || message == WM_MOUSEHWHEEL) {
